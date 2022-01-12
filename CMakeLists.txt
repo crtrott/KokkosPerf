@@ -12,6 +12,7 @@ cmake_minimum_required(VERSION 3.9)
 
 option(ENABLE_RAJA_SEQUENTIAL "Run sequential variants of RAJA kernels. Disable
 this, and all other variants, to run _only_ raw C loops." On)
+option(ENABLE_KOKKOS "Include Kokkos implementations of the kernels in the RAJA Perfsuite" Off)
 
 #
 # Initialize the BLT build system
@@ -25,20 +26,14 @@ set(ENABLE_TESTS Off CACHE BOOL "Enable BLT and RAJA tests")
 set(ENABLE_EXAMPLES Off CACHE BOOL "Enable RAJA examples")
 set(RAJA_ENABLE_EXERCISES Off CACHE BOOL "Enable RAJA exercises")
 
-set(CMAKE_CXX_STANDARD 11)
-set(BLT_CXX_STANDARD 11)
-
+if(ENABLE_KOKKOS)
+  set(CMAKE_CXX_STANDARD 14)
+  set(BLT_CXX_STANDARD 14)
+endif()
 include(blt/SetupBLT.cmake)
 
 #
-# Define RAJA PERFSUITE settings...
-#
-
-cmake_dependent_option(RAJA_PERFSUITE_ENABLE_MPI "Build with MPI" On "ENABLE_MPI" Off)
-
-#
 # Define RAJA settings...
-#
 
 set(ENABLE_TESTS Off CACHE BOOL "")
 set(ENABLE_EXAMPLES Off CACHE BOOL "")
@@ -59,11 +54,8 @@ add_subdirectory(tpl/RAJA)
 get_property(RAJA_INCLUDE_DIRS DIRECTORY tpl/RAJA PROPERTY INCLUDE_DIRECTORIES)
 include_directories(${RAJA_INCLUDE_DIRS})
 
-
 #
 # Setup variables to pass to Perf suite
-#
-
 #
 # These (hopefully temporary) macro constants are needed to work-around
 # performance issues in the xl compiler.
@@ -81,16 +73,18 @@ set(RAJA_PERFSUITE_VERSION_PATCHLEVEL 0)
 
 set(RAJA_PERFSUITE_DEPENDS RAJA)
 
-if (RAJA_PERFSUITE_ENABLE_MPI)
-  list(APPEND RAJA_PERFSUITE_DEPENDS mpi)
-endif()
 if (ENABLE_OPENMP)
   list(APPEND RAJA_PERFSUITE_DEPENDS openmp)
 endif()
 if (ENABLE_CUDA)
   list(APPEND RAJA_PERFSUITE_DEPENDS cuda)
 endif()
-if (ENABLE_HIP)
+
+# Kokkos requires hipcc as the CMAKE_CXX_COMPILER for HIP AMD/VEGA GPU
+# platforms, whereas RAJAPerf Suite uses blt/CMake FindHIP to set HIP compiler 
+# Separate RAJAPerf Suite and Kokkos handling of HIP compilers
+
+if ((ENABLE_HIP) AND (NOT ENABLE_KOKKOS))
   list(APPEND RAJA_PERFSUITE_DEPENDS hip)
 endif()
 
@@ -98,9 +92,10 @@ set(RAJAPERF_BUILD_SYSTYPE $ENV{SYS_TYPE})
 set(RAJAPERF_BUILD_HOST $ENV{HOSTNAME})
 
 if (ENABLE_CUDA)
-  set(CMAKE_CUDA_STANDARD 11)
+  if (ENABLE_CUDA AND ENABLE_KOKKOS)
+  	set(CMAKE_CUDA_STANDARD 14)
+  endif()
   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -restrict -arch ${CUDA_ARCH} --expt-extended-lambda --expt-relaxed-constexpr")
-
   set(RAJAPERF_COMPILER "${CUDA_NVCC_EXECUTABLE}")
   list(APPEND RAJAPERF_COMPILER ${CMAKE_CXX_COMPILER})
   set(RAJAPERF_COMPILER_OPTIONS "${CUDA_NVCC_FLAGS}")
@@ -120,11 +115,55 @@ configure_file(${CMAKE_SOURCE_DIR}/src/rajaperf_config.hpp.in
 
 include_directories($<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/bin>)
 
-# Make sure RAJA flag propagate (we need to do some house cleaning to
+# Make sure RAJA flags propagate (we need to do some tidying to 
 # remove project-specific CMake variables that are no longer needed)
 set (CUDA_NVCC_FLAGS ${RAJA_NVCC_FLAGS})
 
-#
-# Each directory in the perf suite has its own CMakeLists.txt file.
-#
+# The statement below is required for Kokkos compilation.
+if(ENABLE_KOKKOS)
+  include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/tpl/RAJA/include/)
+endif()
+
+
+# ENABLE_KOKKOS is A RAJAPerf Suite Option
+if(ENABLE_KOKKOS)
+  add_definitions(-DRUN_KOKKOS)
+  if(ENABLE_HIP)
+    set(Kokkos_ENABLE_HIP ON CACHE BOOL "Kokkos builds for AMD HIP set the
+Kokkos_ENABLE_HIP variable to ON")	
+    #set(Kokkos_ARCH_VEGA900 ON CACHE BOOL "Docstring") #TODO: better
+  endif()
+  if(ENABLE_TARGET_OPENMP)
+    set(Kokkos_ENABLE_OPENMPTARGET ON CACHE BOOL "Docstring")	
+    set(Kokkos_ARCH_VOLTA70 ON CACHE BOOL "Docstring") #TODO: better
+    set(CMAKE_CXX_STANDARD 17)
+    set(BLT_CXX_STANDARD 17)
+    set(RAJA_ENABLE_TARGET_OPENMP ON CACHE BOOL "Docstring")
+    if(NOT CMAKE_BUILD_TYPE MATCHES Debug)
+      if(NOT EXPERIMENTAL_BUILD)
+	      message(FATAL_ERROR "Kokkos builds with OpenMPTarget require a Debug build to succeed at the moment. Rebuild with CMAKE_BUILD_TYPE=Debug. If you're a compiler developer, rebuild with -DEXPERIMENTAL_BUILD=ON")
+      endif()
+    endif()
+
+    #add_definitions(-DRAJA_ENABLE_TARGET_OPENMP)
+  endif()
+
+# ENABLE_CUDA IS A RAJA PERFSUITE OPTION
+  if(ENABLE_CUDA)
+	  set(Kokkos_ENABLE_CUDA ON CACHE BOOL "Docstring")
+	  set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "Docstring")
+	  set(Kokkos_ARCH_VOLTA70 ON CACHE BOOL "Docstring") #TODO: better
+    enable_language(CUDA)
+  endif()
+  if(ENABLE_OPENMP)
+    set(Kokkos_ENABLE_OPENMP ON CACHE BOOL "Docstring")
+  endif()
+
+  add_subdirectory(tpl/kokkos)
+  get_property(KOKKOS_INCLUDE_DIRS DIRECTORY tpl/kokkos PROPERTY INCLUDE_DIRECTORIES)
+  include_directories(${KOKKOS_INCLUDE_DIRS})
+  
+  list(APPEND RAJA_PERFSUITE_DEPENDS kokkos)
+endif()
+
 add_subdirectory(src)
