@@ -723,7 +723,9 @@ void Executor::runSuite()
 
   warmup_kernels.push_back(new basic::DAXPY(run_params));
   warmup_kernels.push_back(new basic::REDUCE3_INT(run_params));
+#ifndef RUN_KOKKOS
   warmup_kernels.push_back(new algorithm::SORT(run_params));
+#endif
 
   for (size_t ik = 0; ik < warmup_kernels.size(); ++ik) {
     KernelBase* warmup_kernel = warmup_kernels[ik];

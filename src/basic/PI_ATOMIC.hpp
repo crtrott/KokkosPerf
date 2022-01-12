@@ -27,7 +27,6 @@
   Real_type dx = m_dx; \
   Real_ptr pi = m_pi;
 
-
 #include "common/KernelBase.hpp"
 
 namespace rajaperf
@@ -54,6 +53,9 @@ public:
   void runCudaVariant(VariantID vid);
   void runHipVariant(VariantID vid);
   void runOpenMPTargetVariant(VariantID vid);
+
+
+  void runKokkosVariant(VariantID vid);
 
 private:
   Real_type m_dx;

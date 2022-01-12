@@ -175,6 +175,12 @@ void KernelBase::runKernel(VariantID vid)
 #endif
       break;
     }
+    case Kokkos_Lambda :
+    {
+#if defined(RUN_KOKKOS)
+      runKokkosVariant(vid);
+#endif
+    }
 
     default : {
 #if 0

@@ -57,6 +57,11 @@ public:
   void runHipVariant(VariantID vid);
   void runOpenMPTargetVariant(VariantID vid);
 
+  void runKokkosVariant(VariantID vid)
+  {
+     getCout() << "\n PI_REDUCE : Unknown Kokkos variant id = " << vid << std::endl;
+  }
+
 private:
   Real_type m_dx;
   Real_type m_pi;

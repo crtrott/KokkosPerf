@@ -164,6 +164,9 @@ public:
 #if defined(RAJA_ENABLE_TARGET_OPENMP)
   virtual void runOpenMPTargetVariant(VariantID vid) = 0;
 #endif
+#if defined(RUN_KOKKOS)
+  virtual void runKokkosVariant(VariantID vid) = 0;
+#endif
 
 protected:
   const RunParams& run_params;

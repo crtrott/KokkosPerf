@@ -258,6 +258,8 @@ static const std::string VariantNames [] =
   std::string("Lambda_HIP"),
   std::string("RAJA_HIP"),
 
+  std::string("Kokkos_Lambda"),
+
   std::string("Unknown Variant")  // Keep this at the end and DO NOT remove....
 
 }; // END VariantNames
@@ -402,6 +404,12 @@ bool isVariantAvailable(VariantID vid)
   }
 #endif
 
+#if defined(RUN_KOKKOS)
+  if (vid == Kokkos_Lambda) {
+    ret_val = true;
+  }
+#endif
+
   return ret_val;
 }
 
@@ -483,6 +491,7 @@ KernelBase* getKernelObject(KernelID kid,
        break;
     }
 
+#ifndef RUN_KOKKOS
 //
 // Lcals kernels...
 //
@@ -674,6 +683,8 @@ KernelBase* getKernelObject(KernelID kid,
        kernel = new algorithm::SORTPAIRS(run_params);
        break;
     }
+
+#endif
 
     default: {
       getCout() << "\n Unknown Kernel ID = " << kid << std::endl;

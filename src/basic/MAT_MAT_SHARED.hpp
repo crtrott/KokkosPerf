@@ -155,6 +155,11 @@ public:
   void runHipVariant(VariantID vid);
   void runOpenMPTargetVariant(VariantID vid);
 
+  void runKokkosVariant(VariantID vid)
+  {
+     getCout() << "\n MAT_MAT_SHARED : Unknown Kokkos variant id = " << vid << std::endl;
+  }
+
 private:
   Real_ptr m_A;
   Real_ptr m_B;
